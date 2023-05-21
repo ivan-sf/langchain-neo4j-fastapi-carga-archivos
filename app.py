@@ -73,7 +73,7 @@ async def upload_csv(user_id: str = Body(...), file: UploadFile = File(...)):
     else:
         return {"error": "Formato de archivo inválido. Solo se permiten archivos CSV."}
 
-@app.post("/consultas")
+@app.post("/querys")
 def run_query(consulta: Consulta):
     # Verificar si el archivo existe
     file_path = os.path.join("files", consulta.file_name)
@@ -89,18 +89,23 @@ def run_query(consulta: Consulta):
     # Ejecutar la consulta y guardar la pregunta y respuesta en nodos individuales en Neo4j
     with driver.session() as session:
         response = agent.run(consulta.query.question)
-        session.run(
-            """
-            MATCH (f:File {unique_filename: $file_name})
-            CREATE (f)<-[:PERTENECE_A]-(p:Pregunta {contenido: $question})
-            CREATE (p)-[:TIENE_RESPUESTA]->(r:Respuesta {answer: $answer})
-            """,
-            file_name=consulta.file_name,
-            question=consulta.query.question,
-            answer=response
-        )
+        create_nodes_in_neo4j(session, consulta.file_name, consulta.query.question, response)
 
     return {"question": consulta.query.question, "answer": response}
+
+
+def create_nodes_in_neo4j(session, file_name, question, answer):
+    session.run(
+        """
+        MATCH (f:File {unique_filename: $file_name})
+        CREATE (f)<-[:PERTENECE_A]-(p:Pregunta {contenido: $question})
+        CREATE (p)-[:TIENE_RESPUESTA]->(r:Respuesta {answer: $answer})
+        """,
+        file_name=file_name,
+        question=question,
+        answer=answer
+    )
+
 
 # Función para crear un nodo "Person" en Neo4j
 def create_user_node(tx, user_id, first_name, last_name):

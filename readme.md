@@ -46,7 +46,7 @@ Este endpoint permite cargar un archivo CSV y vincularlo a un usuario existente 
 
 Este endpoint permite ejecutar una consulta en un archivo CSV y guardar la pregunta y la respuesta en la base de datos Neo4j.
 
-- Ruta: `/consultas`
+- Ruta: `/querys`
 - Método: `POST`
 - Parámetros:
     - `query` (objeto JSON):
@@ -69,9 +69,9 @@ Este endpoint permite ejecutar una consulta en un archivo CSV y guardar la pregu
     POST /upload_csv/?user_id=123
     Archivo a cargar: example.csv
 
-### Ejecutar consulta
+### Ejecutar consquerysulta
 
-    POST /consultas
+    POST /querys
     { 
 	    "query": 
 		    {"question": "¿Cuál es el total de ventas?"},
