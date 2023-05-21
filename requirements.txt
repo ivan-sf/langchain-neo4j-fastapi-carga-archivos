@@ -1,0 +1,7 @@
+fastapi
+pydantic
+python-dotenv
+langchain
+neo4j
+uvicorn
+python-multipart
