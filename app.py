@@ -162,6 +162,34 @@ def answerSearch(query_request: QueryRequest):
 
     return {"question": question, "answer": answer}
 
+
+
+@app.post("/answer-pdf")
+def answerSearch(query_request: QueryRequest):
+    file_name_txt = query_request.file_name.replace(".pdf", ".txt")
+
+    loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=file_name_txt)
+    documents = loader.load()
+    
+    text_splitter = CharacterTextSplitter(chunk_size=2500, chunk_overlap=0)
+    texts = text_splitter.split_documents(documents)
+
+    docsearch = Chroma.from_documents(texts, embeddings)
+    qa = RetrievalQA.from_chain_type(
+        llm=OpenAI(),
+        chain_type="stuff",
+        retriever=docsearch.as_retriever()
+    )
+
+    question = query_request.query
+    answer = qa.run(question)
+
+    with driver.session() as session:
+        create_nodes_in_neo4j(session, query_request.file_name, question, answer)
+
+    return {"question": question, "answer": answer}
+    
+
 # Función para crear una pregunta y su respuesta con relaciones en Neo4j
 def create_nodes_in_neo4j(session, file_name, question, answer):
     timestamp = datetime.now().timestamp() 
