@@ -92,9 +92,10 @@ async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     if not os.path.exists(directory):
         os.makedirs(directory)
     
-    # Generar un nombre único para el archivo
-    unique_filename = str(uuid.uuid4())
-    file_path = os.path.join(directory, unique_filename + extension)
+    # Generar un nombre único para el archivo con la extensión original
+    unique_filename = str(uuid.uuid4()) + os.path.splitext(file.filename)[1]
+    
+    file_path = os.path.join(directory, unique_filename)
     
     # Leer y guardar el archivo
     contents = await file.read()
@@ -106,17 +107,17 @@ async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
         txt_directory = f"files/{user_id}/txt"
         if not os.path.exists(txt_directory):
             os.makedirs(txt_directory)
-        txt_file_path = os.path.join(txt_directory, unique_filename + ".txt")
+        txt_file_path = os.path.join(txt_directory, unique_filename.replace(".pdf", ".txt"))
         txt_content = convert_pdf_to_txt(file_path)
         with open(txt_file_path, "wb") as txt_file:
             txt_file.write(txt_content)
     
     # Crear la relación entre el usuario y el archivo en Neo4j
     with driver.session() as session:
-        session.write_transaction(create_file_node, user_id, file.filename, unique_filename, extension.lower())
+        session.write_transaction(create_file_node, user_id, file.filename, unique_filename, extension)
     
     return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
-
+    
 @app.post("/answer-csv")
 def run_query(consulta: Consulta):
     # Verificar si el archivo existe
