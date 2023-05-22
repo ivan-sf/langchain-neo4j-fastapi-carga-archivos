@@ -14,6 +14,7 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
+import PyPDF2
 
 load_dotenv()
 
@@ -56,6 +57,14 @@ def create_user(user_info: User):
     
     return {"status": "Usuario creado correctamente."}
 
+def convert_pdf_to_txt(pdf_path):
+    with open(pdf_path, "rb") as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+    return text.encode("utf-8")
+
 @app.post("/upload_file/")
 async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     # Verificar si el usuario existe en Neo4j
@@ -74,27 +83,39 @@ async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     elif extension.lower() == ".txt":
         # Guardar el archivo en la carpeta TXT
         directory = f"files/{user_id}/txt"
+    elif extension.lower() == ".pdf":
+        # Guardar el archivo en la carpeta PDF
+        directory = f"files/{user_id}/pdf"
     else:
-        return {"error": "Formato de archivo inválido. Solo se permiten archivos CSV o TXT."}
+        return {"error": "Formato de archivo inválido. Solo se permiten archivos CSV, TXT o PDF."}
     
     if not os.path.exists(directory):
         os.makedirs(directory)
     
     # Generar un nombre único para el archivo
-    unique_filename = str(uuid.uuid4()) + extension
-    file_path = os.path.join(directory, unique_filename)
+    unique_filename = str(uuid.uuid4())
+    file_path = os.path.join(directory, unique_filename + extension)
     
     # Leer y guardar el archivo
     contents = await file.read()
     with open(file_path, "wb") as f:
         f.write(contents)
     
+    # Convertir el PDF a texto y guardarlo en un archivo TXT
+    if extension.lower() == ".pdf":
+        txt_directory = f"files/{user_id}/txt"
+        if not os.path.exists(txt_directory):
+            os.makedirs(txt_directory)
+        txt_file_path = os.path.join(txt_directory, unique_filename + ".txt")
+        txt_content = convert_pdf_to_txt(file_path)
+        with open(txt_file_path, "wb") as txt_file:
+            txt_file.write(txt_content)
+    
     # Crear la relación entre el usuario y el archivo en Neo4j
     with driver.session() as session:
         session.write_transaction(create_file_node, user_id, file.filename, unique_filename, extension.lower())
     
     return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
-
 
 @app.post("/answer-csv")
 def run_query(consulta: Consulta):
