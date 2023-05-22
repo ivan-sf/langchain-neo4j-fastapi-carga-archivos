@@ -155,6 +155,11 @@ def run_query(consulta: Consulta):
     return {"question": consulta.query.question, "answer": response}
 
 
+async def process_question(session, agent, question):
+    response = agent.run(question)
+    # Realiza las operaciones necesarias con la respuesta, como guardarla en la base de datos o enviarla al cliente
+    return {"question": question, "answer": response}
+
 @app.websocket("/socket/answer-csv")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -174,29 +179,27 @@ async def websocket_endpoint(websocket: WebSocket):
             loader = CSVLoader(file_path)
             data = loader.load()
 
-            agent = create_csv_agent(llm, file_path, verbose=True)
-
             answers = []
 
             with driver.session() as session:
                 tasks = []
                 for question in consulta_json["questions"]:
-                    task = asyncio.create_task(handle_question(session, agent, question, answers))
+                    agent = create_csv_agent(llm, file_path, verbose=True)  # Crear un nuevo agente para cada pregunta
+                    task = process_question(session, agent, question)
                     tasks.append(task)
 
-                await asyncio.gather(*tasks)
+                # Esperar a que se completen todas las solicitudes concurrentes
+                completed_tasks = await asyncio.gather(*tasks)
+
+                for result in completed_tasks:
+                    create_nodes_in_neo4j(session, consulta_json["file_name"], result["question"], result["answer"])
+                    answers.append(result)
 
             await websocket.send_json({"answers": answers})
 
     except WebSocketDisconnect:
         connections.remove(websocket)
 
-async def handle_question(session, agent, question, answers):
-    response = agent.run(question)
-    create_nodes_in_neo4j(session, consulta_json["file_name"], question, response)
-    answers.append({"question": question, "answer": response})
-
-    
 @app.post("/answer-txt")
 def answerSearch(query_request: QueryRequest):
     loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=query_request.file_name)
