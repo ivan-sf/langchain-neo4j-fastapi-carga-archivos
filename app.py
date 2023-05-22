@@ -1,13 +1,19 @@
+import uuid
+import os
 from typing import List
 from fastapi import FastAPI, File, UploadFile, Body
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from neo4j import GraphDatabase, basic_auth
+from datetime import datetime
 from langchain import OpenAI
 from langchain.document_loaders.csv_loader import CSVLoader
-from neo4j import GraphDatabase, basic_auth
 from langchain.agents import create_csv_agent
-import os
-import uuid
+from langchain.document_loaders import DirectoryLoader, TextLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
 
 load_dotenv()
 
@@ -18,6 +24,7 @@ neo4j_uri = os.getenv("NEO4J_URI")
 neo4j_user = os.getenv("NEO4J_USER")
 neo4j_password = os.getenv("NEO4J_PASSWORD")
 driver = GraphDatabase.driver(neo4j_uri, auth=basic_auth(neo4j_user, neo4j_password))
+embeddings = OpenAIEmbeddings()
 
 class Query(BaseModel):
     question: str
@@ -29,6 +36,12 @@ class User(BaseModel):
 
 class Consulta(BaseModel):
     query: Query
+    user_id: str
+    file_name: str
+
+class QueryRequest(BaseModel):
+    query: str
+    user_id: str
     file_name: str
 
 
@@ -43,8 +56,8 @@ def create_user(user_info: User):
     
     return {"status": "Usuario creado correctamente."}
 
-@app.post("/upload_csv/")
-async def upload_csv(user_id: str = Body(...), file: UploadFile = File(...)):
+@app.post("/upload_file/")
+async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     # Verificar si el usuario existe en Neo4j
     with driver.session() as session:
         result = session.read_transaction(find_user_node, user_id)
@@ -52,31 +65,41 @@ async def upload_csv(user_id: str = Body(...), file: UploadFile = File(...)):
     if not result:
         return {"error": "El usuario no existe."}
     
-    # Verificar la extensión del archivo
-    if file.filename.endswith(".csv"):
-        # Generar un nombre único para el archivo
-        unique_filename = str(uuid.uuid4()) + ".csv"
-        
-        # Crear la ruta completa para guardar el archivo
-        file_path = os.path.join("files", unique_filename)
-        
-        # Leer y guardar el archivo
-        contents = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(contents)
-        
-        # Crear la relación entre el usuario y el archivo en Neo4j
-        with driver.session() as session:
-            session.write_transaction(create_file_node, user_id, file.filename, unique_filename)
-        
-        return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
+    # Obtener la extensión del archivo
+    extension = os.path.splitext(file.filename)[1]
+    
+    if extension.lower() == ".csv":
+        # Guardar el archivo en la carpeta CSV
+        directory = f"files/{user_id}/csv"
+    elif extension.lower() == ".txt":
+        # Guardar el archivo en la carpeta TXT
+        directory = f"files/{user_id}/txt"
     else:
-        return {"error": "Formato de archivo inválido. Solo se permiten archivos CSV."}
+        return {"error": "Formato de archivo inválido. Solo se permiten archivos CSV o TXT."}
+    
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    
+    # Generar un nombre único para el archivo
+    unique_filename = str(uuid.uuid4()) + extension
+    file_path = os.path.join(directory, unique_filename)
+    
+    # Leer y guardar el archivo
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Crear la relación entre el usuario y el archivo en Neo4j
+    with driver.session() as session:
+        session.write_transaction(create_file_node, user_id, file.filename, unique_filename, extension.lower())
+    
+    return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
 
-@app.post("/querys")
+
+@app.post("/answer-csv")
 def run_query(consulta: Consulta):
     # Verificar si el archivo existe
-    file_path = os.path.join("files", consulta.file_name)
+    file_path = os.path.join("files/"+consulta.user_id+"/csv", consulta.file_name)
     if not os.path.exists(file_path):
         return {"error": "El archivo no existe."}
 
@@ -94,18 +117,44 @@ def run_query(consulta: Consulta):
     return {"question": consulta.query.question, "answer": response}
 
 
+@app.post("/answer-txt")
+def answerSearch(query_request: QueryRequest):
+    loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=query_request.file_name)
+    documents = loader.load()
+    
+    text_splitter = CharacterTextSplitter(chunk_size=2500, chunk_overlap=0)
+    texts = text_splitter.split_documents(documents)
+
+    docsearch = Chroma.from_documents(texts, embeddings)
+    qa = RetrievalQA.from_chain_type(
+        llm=OpenAI(),
+        chain_type="stuff",
+        retriever=docsearch.as_retriever()
+    )
+
+    question = query_request.query
+    answer = qa.run(question)
+
+    with driver.session() as session:
+        create_nodes_in_neo4j(session, query_request.file_name, question, answer)
+
+    return {"question": question, "answer": answer}
+
+# Función para crear una pregunta y su respuesta con relaciones en Neo4j
 def create_nodes_in_neo4j(session, file_name, question, answer):
+    timestamp = datetime.now().timestamp() 
+    
     session.run(
         """
         MATCH (f:File {unique_filename: $file_name})
-        CREATE (f)<-[:PERTENECE_A]-(p:Pregunta {contenido: $question})
-        CREATE (p)-[:TIENE_RESPUESTA]->(r:Respuesta {answer: $answer})
+        CREATE (f)<-[:DOCUMENT_QUESTION]-(p:Question {contenido: $question, timestamp: $timestamp})
+        CREATE (p)-[:DOCUMENT_ANSWER]->(r:Answer {answer: $answer, timestamp: $timestamp})
         """,
         file_name=file_name,
         question=question,
-        answer=answer
+        answer=answer,
+        timestamp=timestamp
     )
-
 
 # Función para crear un nodo "Person" en Neo4j
 def create_user_node(tx, user_id, first_name, last_name):
@@ -125,17 +174,21 @@ def find_user_node(tx, user_id):
     return result.single() is not None
 
 # Función para crear un nodo "File" en Neo4j y establecer la relación entre el usuario y el archivo
-def create_file_node(tx, user_id, original_filename, unique_filename):
+def create_file_node(tx, user_id, original_filename, unique_filename, file_type):
     tx.run(
         """
         MATCH (p:Person {user_id: $user_id})
-        CREATE (f:File {original_filename: $original_filename, unique_filename: $unique_filename})
-        CREATE (f)-[:PERTENECE_A]->(p)
+        MERGE (f:File {original_filename: $original_filename, unique_filename: $unique_filename})
+        MERGE (t:FileType {type: $file_type})<-[:HAS_FILES_TYPE]-(p)
+        MERGE (f)-[:DOCUMENT_TYPE]->(t)
         """,
         user_id=user_id,
         original_filename=original_filename,
-        unique_filename=unique_filename
+        unique_filename=unique_filename,
+        file_type=file_type
     )
-    
+
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
