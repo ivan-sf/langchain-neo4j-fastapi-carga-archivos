@@ -160,7 +160,7 @@ async def process_question_csv(session, agent, question):
     # Realiza las operaciones necesarias con la respuesta, como guardarla en la base de datos o enviarla al cliente
     return {"question": question, "answer": response}
 
-@app.websocket("/socket/answer-csv")
+@app.websocket("/ws/answer-csv")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connections.append(websocket)
@@ -200,7 +200,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         connections.remove(websocket)
 
-@app.post("/answer-txt")
+@app.post("/api/answer-txt")
 def answerSearch(query_request: QueryRequest):
     loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=query_request.file_name)
     documents = loader.load()
@@ -224,13 +224,6 @@ def answerSearch(query_request: QueryRequest):
     return {"question": question, "answer": answer}
 
     
-
-
-
-
-
-
-
 
 
 @app.websocket("/ws/answer-txt")
@@ -273,19 +266,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-@app.post("/answer-pdf")
+@app.post("/api/answer-pdf")
 def answerSearch(query_request: QueryRequest):
     file_name_txt = query_request.file_name.replace(".pdf", ".txt")
 
@@ -310,6 +291,47 @@ def answerSearch(query_request: QueryRequest):
 
     return {"question": question, "answer": answer}
     
+
+@app.websocket("/ws/answer-pdf")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    
+    while True:
+        try:
+            # Recibir datos del cliente
+            query_request = await websocket.receive_json()
+            
+            # Procesar la solicitud del cliente
+            file_name_txt = query_request["file_name"].replace(".pdf", ".txt")
+
+            loader = DirectoryLoader('files/' + query_request["user_id"] + "/txt/", glob=file_name_txt)
+            documents = loader.load()
+
+            text_splitter = CharacterTextSplitter(chunk_size=2500, chunk_overlap=0)
+            texts = text_splitter.split_documents(documents)
+
+            docsearch = Chroma.from_documents(texts, embeddings)
+            qa = RetrievalQA.from_chain_type(
+                llm=OpenAI(),
+                chain_type="stuff",
+                retriever=docsearch.as_retriever()
+            )
+
+            question = query_request["query"]
+            answer = qa.run(question)
+
+            with driver.session() as session:
+                create_nodes_in_neo4j(session, query_request["file_name"], question, answer)
+
+            response = {"question": question, "answer": answer}
+            
+            # Enviar la respuesta al cliente
+            await websocket.send_json(response)
+            
+        except WebSocketDisconnect:
+            break
+
+
 
 # Función para crear una pregunta y su respuesta con relaciones en Neo4j
 def create_nodes_in_neo4j(session, file_name, question, answer):
