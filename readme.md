@@ -16,8 +16,9 @@ Esta API permite realizar preguntas y obtener respuestas basadas en archivos CSV
 3.  Configura las variables de entorno:
     
     Crea un archivo `.env` en el directorio raíz y define las siguientes variables:
-        
-    `OPENAI_API_KEY=<OPENAI_API_KEY>
+
+    ```bash 
+    OPENAI_API_KEY=<OPENAI_API_KEY>
     NEO4J_URI=<URI_DE_NEO4J>
     NEO4J_USER=<USUARIO_DE_NEO4J>
     NEO4J_PASSWORD=<CONTRASEÑA_DE_NEO4J>` 
