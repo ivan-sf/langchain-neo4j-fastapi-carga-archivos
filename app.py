@@ -15,11 +15,27 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 import PyPDF2
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+import asyncio
+
+origins = [
+    "*"
+]
 
 load_dotenv()
 
 app = FastAPI()
+connections = []  # Lista para almacenar las conexiones de los clientes
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Configurar la conexión a Neo4j
 neo4j_uri = os.getenv("NEO4J_URI")
 neo4j_user = os.getenv("NEO4J_USER")
@@ -117,15 +133,15 @@ async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
         session.write_transaction(create_file_node, user_id, file.filename, unique_filename, extension)
     
     return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
-    
-@app.post("/answer-csv")
+
+@app.post("/api/answer-csv")
 def run_query(consulta: Consulta):
     # Verificar si el archivo existe
     file_path = os.path.join("files/"+consulta.user_id+"/csv", consulta.file_name)
     if not os.path.exists(file_path):
         return {"error": "El archivo no existe."}
 
-    llm = OpenAI(temperature=0)
+    llm = OpenAI(temperature=1)
     loader = CSVLoader(file_path)
     data = loader.load()
 
@@ -139,6 +155,48 @@ def run_query(consulta: Consulta):
     return {"question": consulta.query.question, "answer": response}
 
 
+@app.websocket("/socket/answer-csv")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    connections.append(websocket)
+
+    try:
+        while True:
+            consulta = await websocket.receive_text()
+            consulta_json = json.loads(consulta)
+
+            file_path = os.path.join("files/" + consulta_json["user_id"] + "/csv", consulta_json["file_name"])
+            if not os.path.exists(file_path):
+                await websocket.send_json({"error": "El archivo no existe."})
+                continue
+
+            llm = OpenAI(temperature=1)
+            loader = CSVLoader(file_path)
+            data = loader.load()
+
+            agent = create_csv_agent(llm, file_path, verbose=True)
+
+            answers = []
+
+            with driver.session() as session:
+                tasks = []
+                for question in consulta_json["questions"]:
+                    task = asyncio.create_task(handle_question(session, agent, question, answers))
+                    tasks.append(task)
+
+                await asyncio.gather(*tasks)
+
+            await websocket.send_json({"answers": answers})
+
+    except WebSocketDisconnect:
+        connections.remove(websocket)
+
+async def handle_question(session, agent, question, answers):
+    response = agent.run(question)
+    create_nodes_in_neo4j(session, consulta_json["file_name"], question, response)
+    answers.append({"question": question, "answer": response})
+
+    
 @app.post("/answer-txt")
 def answerSearch(query_request: QueryRequest):
     loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=query_request.file_name)
@@ -178,7 +236,7 @@ def answerSearch(query_request: QueryRequest):
     qa = RetrievalQA.from_chain_type(
         llm=OpenAI(),
         chain_type="stuff",
-        retriever=docsearch.as_retriever()
+        retriever=docsearch.as_retriever(       )
     )
 
     question = query_request.query

@@ -5,3 +5,5 @@ langchain
 neo4j
 uvicorn
 python-multipart
+asyncio
+json
