@@ -28,7 +28,7 @@ Esta API permite realizar preguntas y obtener respuestas basadas en archivos CSV
 
 1.  Inicia el servidor de desarrollo:
        
-    `uvicorn main:app --reload` 
+    `uvicorn app:app --reload` 
     
 2.  Accede a la documentación de la API en tu navegador:
         
