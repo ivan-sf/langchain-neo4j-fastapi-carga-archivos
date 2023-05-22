@@ -1,0 +1,11 @@
+ANSWER CSV
+
+{ "user_id": "345", "file_name": "0016eb4e-c591-4e43-8f8c-d5a8d096b539.csv","questions": ["Cuantas filas tiene el dataframe?"]}
+
+{ "user_id": "345", "file_name": "0016eb4e-c591-4e43-8f8c-d5a8d096b539.csv","questions": ["cuantas columnas tiene el dataframe?"]}
+
+
+
+{"query": "Que es programacion asincrona?", "user_id": "345", "file_name": "24cd1c0b-f6a6-45ca-bfc9-5b7896d203aa.txt"}
+{"query": "Que es asincronia?", "user_id": "345", "file_name": "24cd1c0b-f6a6-45ca-bfc9-5b7896d203aa.txt"}
+{"query": "Que es programacion?", "user_id": "345", "file_name": "24cd1c0b-f6a6-45ca-bfc9-5b7896d203aa.txt"}

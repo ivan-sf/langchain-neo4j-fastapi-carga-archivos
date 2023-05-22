@@ -155,7 +155,7 @@ def run_query(consulta: Consulta):
     return {"question": consulta.query.question, "answer": response}
 
 
-async def process_question(session, agent, question):
+async def process_question_csv(session, agent, question):
     response = agent.run(question)
     # Realiza las operaciones necesarias con la respuesta, como guardarla en la base de datos o enviarla al cliente
     return {"question": question, "answer": response}
@@ -175,7 +175,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"error": "El archivo no existe."})
                 continue
 
-            llm = OpenAI(temperature=1)
+            llm = OpenAI(temperature=0)
             loader = CSVLoader(file_path)
             data = loader.load()
 
@@ -185,7 +185,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 tasks = []
                 for question in consulta_json["questions"]:
                     agent = create_csv_agent(llm, file_path, verbose=True)  # Crear un nuevo agente para cada pregunta
-                    task = process_question(session, agent, question)
+                    task = process_question_csv(session, agent, question)
                     tasks.append(task)
 
                 # Esperar a que se completen todas las solicitudes concurrentes
@@ -222,6 +222,66 @@ def answerSearch(query_request: QueryRequest):
         create_nodes_in_neo4j(session, query_request.file_name, question, answer)
 
     return {"question": question, "answer": answer}
+
+    
+
+
+
+
+
+
+
+
+
+@app.websocket("/ws/answer-txt")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    
+    while True:
+        try:
+            # Recibir datos del cliente
+            query_request = await websocket.receive_json()
+            
+            # Procesar la solicitud del cliente
+            loader = DirectoryLoader('files/' + query_request["user_id"] + "/txt/", glob=query_request["file_name"])
+            documents = loader.load()
+
+            text_splitter = CharacterTextSplitter(chunk_size=2500, chunk_overlap=0)
+            texts = text_splitter.split_documents(documents)
+
+            docsearch = Chroma.from_documents(texts, embeddings)
+            qa = RetrievalQA.from_chain_type(
+                llm=OpenAI(),
+                chain_type="stuff",
+                retriever=docsearch.as_retriever()
+            )
+
+            question = query_request["query"]
+            answer = qa.run(question)
+
+            with driver.session() as session:
+                create_nodes_in_neo4j(session, query_request["file_name"], question, answer)
+
+            response = {"question": question, "answer": answer}
+            
+            # Enviar la respuesta al cliente
+            await websocket.send_json(response)
+            
+        except WebSocketDisconnect:
+            break
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
