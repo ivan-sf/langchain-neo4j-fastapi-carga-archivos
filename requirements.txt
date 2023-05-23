@@ -5,3 +5,8 @@ langchain
 neo4j
 uvicorn
 python-multipart
+PyPDF2
+unstructured
+tabulate
+pdf2image
+chromadb
