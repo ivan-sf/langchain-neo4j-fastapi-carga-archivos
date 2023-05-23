@@ -17,6 +17,7 @@ from langchain.chains import RetrievalQA
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 import json
 import asyncio
 
@@ -61,7 +62,24 @@ class QueryRequest(BaseModel):
     user_id: str
     file_name: str
 
+@app.websocket("/ws/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    connections.append(websocket)
 
+    try:
+        while True:
+            # Recibir mensaje del cliente WebSocket
+            message = await websocket.receive_text()
+            # Procesar el mensaje según tus necesidades
+            # ...
+            # Responder al cliente WebSocket
+            await websocket.send_text("¡Pong!")
+    except Exception as e:
+        print(f"Ocurrió un error en la conexión WebSocket: {str(e)}")
+    finally:
+        connections.remove(websocket)
+    
 @app.post("/users/")
 def create_user(user_info: User):
     user_id = user_info.user_id
@@ -72,6 +90,10 @@ def create_user(user_info: User):
         session.write_transaction(create_user_node, user_id, first_name, last_name)
     
     return {"status": "Usuario creado correctamente."}
+
+@app.get("/")
+def init():
+    return {"status": "Ok   ."}
 
 def convert_pdf_to_txt(pdf_path):
     with open(pdf_path, "rb") as file:
