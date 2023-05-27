@@ -30,11 +30,7 @@ class RelacionCreateRequest(BaseModel):
     relacion_nombre: str
     relacion_propiedades: dict
 
-class PreguntaYML(BaseModel):
-    file_name: str
-    query: str
-
-# Definir el modelo de datos para la solicitud
-class PreguntaJson(BaseModel):
+class QueryJson(BaseModel):
     json_obj: dict
+    user_id: str
     query: str
