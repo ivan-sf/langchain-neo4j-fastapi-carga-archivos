@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes.routes import router 
 from api.routes.users import router as router_users 
@@ -11,6 +12,9 @@ origins = [
 
 app = FastAPI()
 
+connections = []  # Lista para almacenar las conexiones de los clientes
+
+
 @app.get("/", tags=["Hello"])
 def init():
     return {"Hello": "Humans"}
@@ -19,6 +23,136 @@ app.include_router(router_users)
 app.include_router(router_files)
 app.include_router(router)
 app.include_router(router_neo)
+
+@app.websocket("/ws/")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    connections.append(websocket)
+
+    try:
+        while True:
+            # Recibir mensaje del cliente WebSocket
+            message = await websocket.receive_text(timeout=120)
+            await websocket.send_text("¡Pong!")
+    except Exception as e:
+        print(f"Ocurrió un error en la conexión WebSocket: {str(e)}")
+    finally:
+        connections.remove(websocket)
+    
+
+@app.websocket("/ws/answer")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    while True:
+        try:
+            # Recibir datos del cliente
+            print("query_request")
+            query_request = await websocket.receive_json()
+            print("query_request", query_request)
+
+            # Determinar el tipo de solicitud
+            request_type = query_request.get("type")
+
+            # Validar el tipo de solicitud y realizar la acción correspondiente
+            if request_type == "pdf":
+                endpoint = "http://localhost:8000/api/v1/qa/answer-pdf"
+            elif request_type == "csv":
+                endpoint = "http://localhost:8000/api/v1/qa/answer-csv"
+            elif request_type == "txt":
+                endpoint = "http://localhost:8000/api/v1/qa/answer-txt"
+            else:
+                await websocket.send_json({"error": "Tipo de solicitud no válido."})
+                continue
+
+            # Hacer una solicitud al endpoint en lugar de procesar directamente en el websocket
+            async with httpx.AsyncClient(timeout=None) as client:
+                response = await client.post(endpoint, json=query_request)
+                print("response", response)
+
+            if response.status_code == 200:
+                await websocket.send_json(response.json())
+            else:
+                await websocket.send_json({"error": "Error al consultar el endpoint."})
+
+        except WebSocketDisconnect:
+            break
+
+
+
+@app.websocket("/ws/answer-pdf")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    while True:
+        try:
+            # Recibir datos del cliente
+            print("query_request")
+            query_request = await websocket.receive_json()
+            print("query_request", query_request)
+
+            # Hacer una solicitud al endpoint en lugar de procesar directamente en el websocket
+            async with httpx.AsyncClient(timeout=None) as client:
+                response = await client.post("http://localhost:8000/api/v1/qa/answer-pdf", json=query_request)
+                print("response", response)
+
+            if response.status_code == 200:
+                await websocket.send_json(response.json())
+            else:
+                await websocket.send_json({"error": "Error al consultar el endpoint."})
+
+        except WebSocketDisconnect:
+            break
+
+
+@app.websocket("/ws/answer-csv")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    while True:
+        try:
+            # Recibir datos del cliente
+            print("query_request")
+            query_request = await websocket.receive_json()
+            print("query_request", query_request)
+
+            # Hacer una solicitud al endpoint en lugar de procesar directamente en el websocket
+            async with httpx.AsyncClient(timeout=None) as client:
+                response = await client.post("http://localhost:8000/api/v1/qa/answer-csv", json=query_request)
+                print("response", response)
+
+            if response.status_code == 200:
+                await websocket.send_json(response.json())
+            else:
+                await websocket.send_json({"error": "Error al consultar el endpoint."})
+
+        except WebSocketDisconnect:
+            break
+
+@app.websocket("/ws/answer-txt")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    while True:
+        try:
+            # Recibir datos del cliente
+            print("query_request")
+            query_request = await websocket.receive_json()
+            print("query_request", query_request)
+
+            # Hacer una solicitud al endpoint en lugar de procesar directamente en el websocket
+            async with httpx.AsyncClient(timeout=None) as client:
+                response = await client.post("http://localhost:8000/api/v1/qa/answer-txt", json=query_request)
+                print("response", response)
+
+            if response.status_code == 200:
+                await websocket.send_json(response.json())
+            else:
+                await websocket.send_json({"error": "Error al consultar el endpoint."})
+
+        except WebSocketDisconnect:
+            break
+
 
 app.add_middleware(
     CORSMiddleware,
