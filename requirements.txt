@@ -7,3 +7,8 @@ uvicorn
 python-multipart
 asyncio
 json
+PyPDF2
+unstructured
+tabulate
+pdf2image
+chromadb

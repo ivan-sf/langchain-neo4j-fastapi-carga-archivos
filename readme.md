@@ -41,3 +41,36 @@ Esta API permite realizar preguntas y obtener respuestas basadas en archivos CSV
 -   `POST /upload_file/`: Carga un archivo CSV o TXT.
 -   `POST /answer-csv`: Realiza una pregunta en un archivo CSV y obtiene la respuesta.
 -   `POST /answer-txt`: Realiza una pregunta en un archivo TXT y obtiene la respuesta.
+
+## JSON ejemplo
+
+### Crear nodo
+{
+  "etiqueta": "Persona",
+  "propiedades": {
+    "nombre": "Juan",
+    "edad": 30,
+    "ciudad": "Madrid"
+  }
+}
+
+
+### Crear relacion
+
+{
+  "nodo1_etiqueta": "Persona",
+  "nodo1_propiedades": {
+    "nombre_persona": "Juan",
+    "edad_persona": 30
+  },
+  "nodo2_etiqueta": "Empresa",
+  "nodo2_propiedades": {
+    "nombre_empresa": "Empresa A",
+    "direccion_empresa": "Calle Principal"
+  },
+  "relacion_nombre": "TRABAJA_EN",
+  "relacion_propiedades": {
+    "puesto": "Desarrollador",
+    "fecha_inicio": "2022-01-01"
+  }
+}
