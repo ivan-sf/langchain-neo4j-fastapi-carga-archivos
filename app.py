@@ -134,10 +134,6 @@ def run_query(consulta: Consulta):
     return {"question": consulta.query.question, "answer": response}
 
 
-async def process_question_csv(session, agent, question):
-    response = agent.run(question)
-    # Realiza las operaciones necesarias con la respuesta, como guardarla en la base de datos o enviarla al cliente
-    return {"question": question, "answer": response}
 
 
 # Definir el endpoint para responder preguntas sobre un archivo CSV
@@ -189,8 +185,6 @@ def answerSearch(query_request: QueryRequest):
 
     return {"question": question, "answer": answer}
     
-
-
 
 # Definir el endpoint para responder preguntas sobre un objeto JSON
 @app.post("/api/v0/qa/answer-json")
@@ -486,6 +480,10 @@ def create_file_node(tx, user_id, original_filename, unique_filename, file_type)
 def obtener_parametros_cypher(propiedades):
     return "{" + ", ".join(f"{clave}: ${clave}" for clave in propiedades.keys()) + "}"
 
+async def process_question_csv(session, agent, question):
+    response = agent.run(question)
+    # Realiza las operaciones necesarias con la respuesta, como guardarla en la base de datos o enviarla al cliente
+    return {"question": question, "answer": response}
 
 
 if __name__ == "__main__":
