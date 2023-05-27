@@ -44,11 +44,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/", tags=["get"])
 def init():
     return {"Hello": "Humans"}
     
-@app.post("/api/v1/users/create")
+@app.post("/api/v1/users/create", tags=["users"])
 def create_user(user_info: User):
     user_id = user_info.user_id
     first_name = user_info.first_name
@@ -60,7 +60,7 @@ def create_user(user_info: User):
     return {"status": "Usuario creado correctamente."}
 
 
-@app.post("/api/v1/files/upload_file/")
+@app.post("/api/v1/files/upload_file/", tags=["files"])
 async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     # Verificar si el usuario existe en Neo4j
     with driver.session() as session:
@@ -113,7 +113,7 @@ async def upload_file(user_id: str = Body(...), file: UploadFile = File(...)):
     
     return {"user_id": user_id, "filename": unique_filename, "original_filename": file.filename, "status": "Archivo cargado correctamente."}
 
-@app.post("/api/v1/qa/answer-csv")
+@app.post("/api/v1/qa/answer-csv", tags=["qa"])
 def run_query(consulta: Consulta):
     # Verificar si el archivo existe
     file_path = os.path.join("files/"+consulta.user_id+"/csv", consulta.file_name)
@@ -137,7 +137,7 @@ def run_query(consulta: Consulta):
 
 
 # Definir el endpoint para responder preguntas sobre un archivo CSV
-@app.post("/api/v1/qa/answer-yml")
+@app.post("/api/v1/qa/answer-yml", tags=["qa"])
 def responder_pregunta(consulta: PreguntaYML):
     # Verificar si el archivo existe
     file_path = os.path.join("files", consulta.file_name)
@@ -160,7 +160,7 @@ def responder_pregunta(consulta: PreguntaYML):
     return {"question": consulta.query, "answer": response}
 
 
-@app.post("/api/v1/qa/answer-pdf")
+@app.post("/api/v1/qa/answer-pdf", tags=["qa"])
 def answerSearch(query_request: QueryRequest):
     file_name_txt = query_request.file_name.replace(".pdf", ".txt")
 
@@ -187,7 +187,7 @@ def answerSearch(query_request: QueryRequest):
     
 
 # Definir el endpoint para responder preguntas sobre un objeto JSON
-@app.post("/api/v0/qa/answer-json")
+@app.post("/api/v0/qa/answer-json", tags=["qa"])
 def responder_pregunta(pregunta: PreguntaJson):
     # Obtener el objeto JSON y la pregunta de la solicitud
     json_obj = pregunta.json_obj
@@ -206,7 +206,7 @@ def responder_pregunta(pregunta: PreguntaJson):
 
     return {"question": query, "answer": response}
 
-@app.post("/api/v0/qa/answer-txt")
+@app.post("/api/v0/qa/answer-txt", tags=["qa"])
 def answerSearch(query_request: QueryRequest):
     loader = DirectoryLoader('files/' + query_request.user_id + "/txt/", glob=query_request.file_name)
     documents = loader.load()
@@ -230,7 +230,7 @@ def answerSearch(query_request: QueryRequest):
     return {"question": question, "answer": answer}
 
 
-@app.post("/api/v1/neo/create-node")
+@app.post("/api/v1/neo/create-node", tags=["neo4j"])
 def crear_nodo(request: NodoCreateRequest):
     etiqueta = request.etiqueta
     propiedades = request.propiedades
@@ -254,7 +254,7 @@ def crear_nodo(request: NodoCreateRequest):
         session.close()
 
 
-@app.post("/api/v1/neo/create-relation")
+@app.post("/api/v1/neo/create-relation", tags=["neo4j"])
 def crear_relacion(request: RelacionCreateRequest):
     nodo1_etiqueta = request.nodo1_etiqueta
     nodo1_propiedades = request.nodo1_propiedades
