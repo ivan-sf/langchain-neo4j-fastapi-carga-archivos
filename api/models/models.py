@@ -2,13 +2,13 @@ from pydantic import BaseModel
 
 class Query(BaseModel):
     question: str
-
+    
 class User(BaseModel):
     user_id: str
     first_name: str
     last_name: str
 
-class Consulta(BaseModel):
+class QueryCsv(BaseModel):
     query: Query
     user_id: str
     file_name: str

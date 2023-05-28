@@ -5,6 +5,9 @@ from api.routes.routes import router
 from api.routes.users import router as router_users 
 from api.routes.files import router as router_files 
 from api.routes.neo import router as router_neo 
+from api.routes.openai import router as router_openai
+from api.routes.graphql import router as router_graphql
+from api.routes.google import router as router_google
 
 origins = [
     "*"
@@ -23,6 +26,9 @@ app.include_router(router_users)
 app.include_router(router_files)
 app.include_router(router)
 app.include_router(router_neo)
+app.include_router(router_openai)
+app.include_router(router_graphql)
+app.include_router(router_google)
 
 @app.websocket("/ws/")
 async def websocket_endpoint(websocket: WebSocket):

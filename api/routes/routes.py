@@ -4,7 +4,7 @@ import asyncio
 import yaml
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from api.models.models import Query, Consulta, QueryRequest, QueryJson
+from api.models.models import Query, QueryCsv, QueryRequest, QueryJson
 from api.utils.neo4j import driver 
 from datetime import datetime
 from langchain import OpenAI
@@ -53,7 +53,7 @@ def answerSearch(query_request: QueryRequest):
     
 
 @router.post("/answer-csv", tags=["Q-A"])
-def run_query(consulta: Consulta):
+def run_query(consulta: QueryCsv):
     # Verificar si el archivo existe
     file_path = os.path.join("files/"+consulta.user_id+"/csv", consulta.file_name)
     if not os.path.exists(file_path):
