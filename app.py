@@ -8,6 +8,7 @@ from api.routes.neo import router as router_neo
 from api.routes.openai import router as router_openai
 from api.routes.graphql import router as router_graphql
 from api.routes.google import router as router_google
+from api.routes.openapi import router as router_openapi
 
 origins = [
     "*"
@@ -29,6 +30,7 @@ app.include_router(router_neo)
 app.include_router(router_openai)
 app.include_router(router_graphql)
 app.include_router(router_google)
+app.include_router(router_openapi)
 
 @app.websocket("/ws/")
 async def websocket_endpoint(websocket: WebSocket):
