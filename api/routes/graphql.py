@@ -11,7 +11,6 @@ router = APIRouter(prefix="/api/v1/qa")
 
 @router.post("/answer-graphql-be4collect-users", tags=["Q-A"])
 def responder_pregunta(query:QueryGrapQL):
-    url = query.api_url
     tools = load_tools(["graphql"], graphql_endpoint="https://spacex-production.up.railway.app/", llm=llm)
     agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
     graphql_fields = """
@@ -24,7 +23,6 @@ def responder_pregunta(query:QueryGrapQL):
                 dry_mass_kg
                 dry_mass_lb
                 first_flight
-                id
                 name
                 orbit_duration_yr
                 sidewall_angle_deg

@@ -4,7 +4,7 @@ from api.models.openai import Query, Generate,CreateCompletionRequest, CreateCom
 from langchain.llms import OpenAI
 import openai
 
-router = APIRouter(prefix="/api/v1/openai")
+router = APIRouter(prefix="/api/v1/llm")
 
 @router.post("/basic-prompt/", tags=["LLM"])
 async def promp_basic(query:Query):
